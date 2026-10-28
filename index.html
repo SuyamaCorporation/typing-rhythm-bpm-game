@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タイピングリズム BPM 合わせゲーム</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen select-none">
+<div class="max-w-2xl mx-auto p-4">
+  <h1 class="text-3xl font-bold text-center mb-2 text-purple-300">🎵 タイピングリズム</h1>
+  <p class="text-center text-gray-400 mb-6 text-sm">BPM に合わせてスペースキーを叩こう</p>
+
+  <!-- Tab -->
+  <div class="flex mb-4 bg-gray-800 rounded-xl overflow-hidden">
+    <button id="tabGame" aria-label="リズムゲームモード"
+      class="flex-1 py-2 font-bold bg-purple-700 transition">リズムゲーム</button>
+    <button id="tabTap" aria-label="タップBPM計測モード"
+      class="flex-1 py-2 font-bold text-gray-400 hover:bg-gray-700 transition">タップ BPM 計測</button>
+  </div>
+
+  <!-- Game Mode -->
+  <div id="gameModePanel">
+    <div class="bg-gray-800 rounded-xl p-6 mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <label class="text-sm font-bold text-purple-300" for="bpmSlider">BPM:</label>
+        <span id="bpmValue" class="text-2xl font-bold text-yellow-400">120</span>
+      </div>
+      <input type="range" id="bpmSlider" aria-label="BPM調整スライダー"
+        min="60" max="180" value="120" class="w-full accent-purple-500 mb-4">
+      <div class="flex gap-2 mb-4 flex-wrap">
+        <span class="text-xs text-gray-400">プリセット:</span>
+        <button data-bpm="60" aria-label="BPM 60" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">60</button>
+        <button data-bpm="80" aria-label="BPM 80" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">80</button>
+        <button data-bpm="100" aria-label="BPM 100" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">100</button>
+        <button data-bpm="120" aria-label="BPM 120" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">120</button>
+        <button data-bpm="140" aria-label="BPM 140" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">140</button>
+        <button data-bpm="160" aria-label="BPM 160" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">160</button>
+        <button data-bpm="180" aria-label="BPM 180" class="preset-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">180</button>
+      </div>
+
+      <!-- Metronome Visual -->
+      <div class="flex justify-center mb-4">
+        <div id="metronomeCircle" class="w-24 h-24 rounded-full border-4 border-purple-600 flex items-center justify-center transition-all duration-75">
+          <span id="beatIcon" class="text-4xl">🎵</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="toggleMetronome" aria-label="メトロノームを開始/停止" class="flex-1 bg-purple-700 hover:bg-purple-600 text-white font-bold py-3 rounded-xl transition">
+          ▶ 開始
+        </button>
+      </div>
+    </div>
+
+    <!-- Hit Zone -->
+    <div id="hitPanel" class="hidden bg-gray-800 rounded-xl p-6 mb-4 text-center">
+      <div class="text-xs text-gray-400 mb-2">スペースキー または Enterキー でタップ</div>
+      <button id="tapBtn" aria-label="タップボタン（スペースキーでも可）"
+        class="w-full h-32 bg-gray-700 hover:bg-gray-600 active:bg-purple-600 rounded-xl text-3xl font-bold transition border-2 border-purple-700 mb-4">
+        🥁 TAP
+      </button>
+      <div id="judgmentText" class="text-2xl font-bold mb-2 h-8"></div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-green-900 rounded-lg p-2">
+          <div class="text-xs text-green-400">PERFECT</div>
+          <div id="cntPerfect" class="text-xl font-bold text-green-300">0</div>
+        </div>
+        <div class="bg-yellow-900 rounded-lg p-2">
+          <div class="text-xs text-yellow-400">GOOD</div>
+          <div id="cntGood" class="text-xl font-bold text-yellow-300">0</div>
+        </div>
+        <div class="bg-red-900 rounded-lg p-2">
+          <div class="text-xs text-red-400">MISS</div>
+          <div id="cntMiss" class="text-xl font-bold text-red-300">0</div>
+        </div>
+      </div>
+
+      <!-- Precision Graph -->
+      <div>
+        <div class="text-xs text-gray-400 mb-1">精度グラフ (最新20打 / ms誤差)</div>
+        <canvas id="precisionCanvas" width="400" height="80" class="w-full rounded bg-gray-900"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tap BPM Mode -->
+  <div id="tapModePanel" class="hidden">
+    <div class="bg-gray-800 rounded-xl p-6 text-center">
+      <div class="text-gray-400 mb-4 text-sm">曲に合わせてタップしてBPMを計測</div>
+      <button id="tapBpmBtn" aria-label="タップしてBPM計測"
+        class="w-full h-40 bg-gray-700 hover:bg-gray-600 active:bg-indigo-600 rounded-xl text-4xl font-bold transition border-2 border-indigo-600 mb-6">
+        タップ!
+      </button>
+      <div id="tapBpmResult" class="text-5xl font-bold text-yellow-400 mb-2">-- BPM</div>
+      <div id="tapBpmDetail" class="text-sm text-gray-400 mb-4"></div>
+      <button id="resetTapBtn" aria-label="タップをリセット" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition text-sm">
+        リセット
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+let audioCtx = null;
+let bpm = 120;
+let isRunning = false;
+let nextBeatTime = 0;
+let beatScheduler = null;
+let lastBeatActualTime = 0;
+let errorHistory = [];
+let counts = { perfect: 0, good: 0, miss: 0 };
+let judgeTimeout = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playClick(time, loud = true) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.setValueAtTime(loud ? 1000 : 800, time);
+  gain.gain.setValueAtTime(0.3, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+  osc.start(time);
+  osc.stop(time + 0.05);
+}
+
+function scheduleBeat() {
+  const ctx = getAudioCtx();
+  const interval = 60 / bpm;
+  while (nextBeatTime < ctx.currentTime + 0.15) {
+    playClick(nextBeatTime);
+    const delay = (nextBeatTime - ctx.currentTime) * 1000;
+    if (delay >= 0) {
+      setTimeout(() => flashBeat(), delay);
+      lastBeatActualTime = nextBeatTime;
+    }
+    nextBeatTime += interval;
+  }
+}
+
+function flashBeat() {
+  const circle = document.getElementById('metronomeCircle');
+  circle.classList.add('bg-purple-600');
+  circle.style.transform = 'scale(1.15)';
+  setTimeout(() => {
+    circle.classList.remove('bg-purple-600');
+    circle.style.transform = 'scale(1)';
+  }, 80);
+}
+
+document.getElementById('bpmSlider').addEventListener('input', e => {
+  bpm = parseInt(e.target.value);
+  document.getElementById('bpmValue').textContent = bpm;
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    bpm = parseInt(btn.dataset.bpm);
+    document.getElementById('bpmSlider').value = bpm;
+    document.getElementById('bpmValue').textContent = bpm;
+  });
+});
+
+document.getElementById('toggleMetronome').addEventListener('click', () => {
+  if (!isRunning) {
+    isRunning = true;
+    getAudioCtx().resume();
+    nextBeatTime = getAudioCtx().currentTime + 0.1;
+    beatScheduler = setInterval(scheduleBeat, 50);
+    document.getElementById('toggleMetronome').textContent = '■ 停止';
+    document.getElementById('toggleMetronome').classList.replace('bg-purple-700', 'bg-red-700');
+    document.getElementById('hitPanel').classList.remove('hidden');
+    counts = { perfect: 0, good: 0, miss: 0 };
+    errorHistory = [];
+    updateCounts();
+    drawPrecisionGraph();
+  } else {
+    isRunning = false;
+    clearInterval(beatScheduler);
+    document.getElementById('toggleMetronome').textContent = '▶ 開始';
+    document.getElementById('toggleMetronome').classList.replace('bg-red-700', 'bg-purple-700');
+  }
+});
+
+function onTap() {
+  if (!isRunning) return;
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const interval = 60 / bpm;
+
+  // Find nearest beat
+  const beatsBefore = Math.floor((now - (nextBeatTime - interval)) / interval);
+  const nearestBeat = (nextBeatTime - interval) + beatsBefore * interval;
+  const diff = (now - nearestBeat) * 1000; // ms, can be negative (early)
+  const absDiff = Math.abs(diff);
+  const normalizedDiff = diff > interval * 500 ? diff - interval * 1000 : diff;
+
+  errorHistory.push(normalizedDiff);
+  if (errorHistory.length > 20) errorHistory.shift();
+
+  let judgment, color;
+  if (absDiff < 50) {
+    judgment = 'PERFECT!';
+    color = 'text-green-400';
+    counts.perfect++;
+  } else if (absDiff < 100) {
+    judgment = 'GOOD';
+    color = 'text-yellow-400';
+    counts.good++;
+  } else {
+    judgment = 'MISS';
+    color = 'text-red-400';
+    counts.miss++;
+  }
+
+  updateCounts();
+  const jt = document.getElementById('judgmentText');
+  jt.textContent = judgment + (normalizedDiff > 0 ? ' ▶早い' : ' ◀遅い');
+  jt.className = `text-2xl font-bold mb-2 h-8 ${color}`;
+  clearTimeout(judgeTimeout);
+  judgeTimeout = setTimeout(() => { jt.textContent = ''; }, 600);
+  drawPrecisionGraph();
+}
+
+document.getElementById('tapBtn').addEventListener('click', onTap);
+document.addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'Enter') && document.getElementById('gameModePanel').style.display !== 'none') {
+    e.preventDefault();
+    onTap();
+  }
+});
+
+function updateCounts() {
+  document.getElementById('cntPerfect').textContent = counts.perfect;
+  document.getElementById('cntGood').textContent = counts.good;
+  document.getElementById('cntMiss').textContent = counts.miss;
+}
+
+function drawPrecisionGraph() {
+  const canvas = document.getElementById('precisionCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Center line
+  ctx.strokeStyle = '#4b5563';
+  ctx.beginPath();
+  ctx.moveTo(0, H / 2);
+  ctx.lineTo(W, H / 2);
+  ctx.stroke();
+
+  // ±50ms zone
+  ctx.fillStyle = '#052e16';
+  ctx.fillRect(0, H / 2 - H * 50 / 300, W, H * 100 / 300);
+
+  // ±100ms zone
+  ctx.fillStyle = '#1c1917';
+  ctx.fillRect(0, H / 2 - H * 100 / 300, W, H * 200 / 300);
+
+  if (errorHistory.length < 2) return;
+  const n = errorHistory.length;
+  ctx.beginPath();
+  ctx.strokeStyle = '#a855f7';
+  ctx.lineWidth = 2;
+  errorHistory.forEach((err, i) => {
+    const x = (i / (n - 1)) * W;
+    const y = H / 2 - (err / 300) * H;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Dots
+  errorHistory.forEach((err, i) => {
+    const x = (i / (n - 1)) * W;
+    const y = H / 2 - (err / 300) * H;
+    const abs = Math.abs(err);
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = abs < 50 ? '#22c55e' : abs < 100 ? '#f59e0b' : '#ef4444';
+    ctx.fill();
+  });
+}
+
+// Tab logic
+document.getElementById('tabGame').addEventListener('click', () => {
+  document.getElementById('gameModePanel').style.display = '';
+  document.getElementById('tapModePanel').classList.add('hidden');
+  document.getElementById('tabGame').className = 'flex-1 py-2 font-bold bg-purple-700 transition';
+  document.getElementById('tabTap').className = 'flex-1 py-2 font-bold text-gray-400 hover:bg-gray-700 transition';
+});
+document.getElementById('tabTap').addEventListener('click', () => {
+  document.getElementById('gameModePanel').style.display = 'none';
+  document.getElementById('tapModePanel').classList.remove('hidden');
+  document.getElementById('tabTap').className = 'flex-1 py-2 font-bold bg-indigo-700 transition';
+  document.getElementById('tabGame').className = 'flex-1 py-2 font-bold text-gray-400 hover:bg-gray-700 transition';
+});
+
+// Tap BPM mode
+let tapTimes = [];
+document.getElementById('tapBpmBtn').addEventListener('click', () => {
+  const now = performance.now();
+  tapTimes.push(now);
+  if (tapTimes.length < 2) {
+    document.getElementById('tapBpmResult').textContent = 'もう一度…';
+    return;
+  }
+  const recent = tapTimes.slice(-8);
+  const intervals = [];
+  for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
+  const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const calcBpm = Math.round(60000 / avg);
+  document.getElementById('tapBpmResult').textContent = calcBpm + ' BPM';
+  document.getElementById('tapBpmDetail').textContent = `${tapTimes.length}回タップ / 平均間隔 ${avg.toFixed(0)}ms`;
+});
+
+document.getElementById('resetTapBtn').addEventListener('click', () => {
+  tapTimes = [];
+  document.getElementById('tapBpmResult').textContent = '-- BPM';
+  document.getElementById('tapBpmDetail').textContent = '';
+});
+
+// LocalStorage: persist BPM and best stats
+function saveSettings() {
+  localStorage.setItem('rhythm_bpm', bpm);
+  localStorage.setItem('rhythm_counts', JSON.stringify(counts));
+}
+function loadSettings() {
+  const savedBpm = localStorage.getItem('rhythm_bpm');
+  if (savedBpm) {
+    bpm = parseInt(savedBpm);
+    document.getElementById('bpmSlider').value = bpm;
+    document.getElementById('bpmValue').textContent = bpm;
+  }
+}
+loadSettings();
+setInterval(saveSettings, 3000);
+</script>
+</body>
+</html>
